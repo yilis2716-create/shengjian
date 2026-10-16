@@ -1,0 +1,5 @@
+{
+  "enabled": true,
+  "workerName": "shengjian-memory",
+  "workerUrl": "https://shengjian-memory.yilis2716.workers.dev"
+}

@@ -1,0 +1,51 @@
+name: 声笺后台部署
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/cloudflare-deploy-20261016
+      - main
+    paths:
+      - 'cloudflare/**'
+      - '.github/workflows/shengjian-cloudflare.yml'
+permissions:
+  contents: read
+concurrency:
+  group: shengjian-cloudflare-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 检查部署脚本与后台代码
+        run: |
+          node --check cloudflare/worker.mjs
+          node cloudflare/mcp-write-test.mjs
+          node --test cloudflare/deploy.test.mjs
+      - name: 检查授权与部署开关
+        id: ready
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          enabled=$(node -p "JSON.parse(require('fs').readFileSync('cloudflare/deploy-request.json','utf8')).enabled === true")
+          if [ "$enabled" != "true" ]; then
+            echo 'deploy=false' >> "$GITHUB_OUTPUT"
+            echo '### 等待用户授权，部署开关尚未打开。本次未更改 Cloudflare。' >> "$GITHUB_STEP_SUMMARY"
+          elif [ -z "$CF_TOKEN" ]; then
+            echo 'deploy=false' >> "$GITHUB_OUTPUT"
+            echo '### 请先添加 CLOUDFLARE_API_TOKEN 到仓库 Actions Secrets。令牌不要写进代码。' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'deploy=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: 部署到现有 Cloudflare Worker 并验证
+        if: steps.ready.outputs.deploy == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: node cloudflare/deploy.mjs
