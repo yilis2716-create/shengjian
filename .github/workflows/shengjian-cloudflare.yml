@@ -25,6 +25,7 @@ jobs:
       - name: 检查部署脚本与后台代码
         run: |
           node --check cloudflare/worker.mjs
+          node cloudflare/mcp-write-test.mjs
           node --test cloudflare/deploy.test.mjs
       - name: 检查授权与部署开关
         id: ready
