@@ -18,5 +18,5 @@ assert.equal(db.prepare('SELECT COUNT(*) AS n FROM memories').get().n,before);
 r=await rpc('memory_save',{content:'用户喜欢蓝粉色。'});assert(JSON.parse(r.j.result.content[0].text).already_exists);assert.equal(db.prepare('SELECT COUNT(*) AS n FROM memories').get().n,before);
 r=await rpc('memory_save',{content:'冒充其他角色'},{role:b.id});assert.equal(r.status,403);
 r=await rpc('memory_save',{content:'另一角色的记忆'},{key:b.access_token,role:b.id});assert(JSON.parse(r.j.result.content[0].text).ok);r=await rpc('memory_search',{query:'另一角色'});assert.equal(JSON.parse(r.j.result.content[0].text).entries.length,0);
-assert.equal((await api('/health')).j.version,'1.0.1');
+assert.equal((await api('/health')).j.version,'1.1.0');
 console.log('PASS MCP writes: real SQLite through bundled Worker; content-only and alias writes, object/encoded arguments, canonical schema, specific validation, no phantom writes, deduplication and role authorization. No external requests.');
