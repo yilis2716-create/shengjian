@@ -1,0 +1,6 @@
+'use strict';
+// No caching of conversations or API keys; this worker only displays push notifications.
+self.addEventListener('install',()=>self.skipWaiting());
+self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
+self.addEventListener('push',event=>{let data={};try{data=event.data?.json()||{}}catch{}const call=data.kind==='call';event.waitUntil(self.registration.showNotification(call?'声笺 · 语音来电':'声笺 · 新消息',{body:call?'点开声笺后接听；不会自动使用麦克风。':'有人想和你说说话，点开查看。',tag:'shengjian-'+String(data.eventId||Date.now()),renotify:false,data:{cloudRole:String(data.cloudRole||''),eventId:String(data.eventId||'')},requireInteraction:call}))});
+self.addEventListener('notificationclick',event=>{event.notification.close();const data=event.notification.data||{},url=new URL('./',self.registration.scope);url.searchParams.set('contactRole',data.cloudRole||'');event.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(async windows=>{for(const client of windows){if(client.url.startsWith(self.registration.scope)){await client.focus();client.postMessage({type:'open-contact',cloudRole:data.cloudRole,eventId:data.eventId});return}}await self.clients.openWindow(url.href)}))});
