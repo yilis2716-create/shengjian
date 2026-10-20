@@ -49,12 +49,14 @@ export async function deploy({token,accountId='',workerName='shengjian-memory',w
   if(!healthy)throw Error('代码已经上传，但 /health 尚未验证成功；请检查 workers.dev 可访问性和部署日志，不要重建数据库。');
   if(proactive){
     try{
-      const {result:schedules}=await api(path+'/schedules');
+      const {result:scheduleResult}=await api(path+'/schedules');
+      const schedules=Array.isArray(scheduleResult)?scheduleResult:scheduleResult?.schedules;
       if(!Array.isArray(schedules))throw Error('无法读取现有定时器');
       const crons=[...new Set(schedules.map(s=>s.cron))];
       if(!crons.includes('*/5 * * * *')){if(crons.length>=3)throw Error('已有三个定时器，未替换现有任务');await api(path+'/schedules',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify([...crons,'*/5 * * * *'].map(cron=>({cron})))})}
       const checked=await api(path+'/schedules');
-      if(!checked.result?.some(s=>s.cron==='*/5 * * * *'))throw Error('定时器保存后未能确认');
+      const savedSchedules=Array.isArray(checked.result)?checked.result:checked.result?.schedules;
+      if(!savedSchedules?.some(s=>s.cron==='*/5 * * * *'))throw Error('定时器保存后未能确认');
       log('已确认每5分钟云端定时器；Cloudflare 的定时配置传播可能需要数分钟。角色启用仍需手机确认。');
     }catch(e){throw Error('后台和密钥已上传，但定时器未完成：'+redact(e.message)+'。请检查 Workers Scripts Edit 权限或现有定时器数量，不要重建数据库。')}
   }

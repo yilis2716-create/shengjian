@@ -24,7 +24,7 @@ test('new proactive keys form a matching VAPID pair and AES key, while existing 
 });
 test('proactive deployment provisions keys atomically, preserves other cron entries, and verifies timer readback',async()=>{
  const m=mock({bound:bindings.filter(b=>!['CONFIG_ENCRYPTION_KEY','VAPID_PUBLIC_KEY'].includes(b.name))});let crons=['0 12 * * *'],puts=0;
- const base=m.fetch.bind(m);m.fetch=async(url,opts={})=>{if(String(url).endsWith('/schedules')){assert.equal(opts.headers.Authorization,'Bearer '+token);if(opts.method==='PUT'){puts++;crons=JSON.parse(opts.body).map(s=>s.cron)}return ok(crons.map(cron=>({cron})))}return base(url,opts)};
+ const base=m.fetch.bind(m);m.fetch=async(url,opts={})=>{if(String(url).endsWith('/schedules')){assert.equal(opts.headers.Authorization,'Bearer '+token);if(opts.method==='PUT'){puts++;crons=JSON.parse(opts.body).map(s=>s.cron)}return ok({schedules:crons.map(cron=>({cron}))})}return base(url,opts)};
  await run(m,{proactive:true});assert.equal(puts,1);assert.deepEqual(crons,['0 12 * * *','*/5 * * * *']);
  assert.equal(m.uploaded.bindings.filter(b=>b.name==='CONFIG_ENCRYPTION_KEY').length,1);assert.equal(m.uploaded.bindings.filter(b=>b.name==='VAPID_PRIVATE_JWK').length,1);
  for(const b of m.uploaded.bindings.filter(b=>b.type==='secret_text'))assert(!m.logs.join().includes(b.text));
