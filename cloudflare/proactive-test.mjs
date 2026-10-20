@@ -46,6 +46,19 @@ db.prepare('UPDATE contact_configs SET last_activity=?,next_at=0 WHERE role_id=?
 const countBeforeRace=db.prepare('SELECT COUNT(*) AS n FROM contact_events WHERE role_id=?').get(roleD.id).n;
 await worker.runProactiveScheduled(env,now,async(url,opts)=>{if(String(url).startsWith('https://chat.example/'))await api(dbase+'activity',{key:roleD.access_token,data:{last_activity:Date.now()}});return fakeFetch(url,opts)});
 assert.equal(db.prepare('SELECT COUNT(*) AS n FROM contact_events WHERE role_id=?').get(roleD.id).n,countBeforeRace,'do not publish a greeting after the user returns during generation');
+// Status is read-only and exposes clocks/outcomes without credentials or secret payloads.
+const beforeStatus=db.prepare('SELECT last_activity FROM contact_configs WHERE role_id=?').get(roleD.id).last_activity;
+const details=(await api(dbase+'config',{key:roleD.access_token})).j;
+assert.equal(details.status.last_activity,beforeStatus);assert.equal(details.status.scheduler.phase,'completed');assert.equal(details.status.last_outcome.result,'cancelled');
+assert.equal(db.prepare('SELECT last_activity FROM contact_configs WHERE role_id=?').get(roleD.id).last_activity,beforeStatus);
+assert(!JSON.stringify(details).includes(settings.api_key));assert(!JSON.stringify(details).includes(env.CONFIG_ENCRYPTION_KEY));
+// Preserve a specific, sanitized model failure diagnosis instead of guessing the cause.
+const roleE=(await api('/api/roles',{data:{name:'状态错误测试'}})).j,eb='/api/roles/'+roleE.id+'/proactive/';
+await api(eb+'config',{key:roleE.access_token,data:{...settings,mode:'inactivity',interval:120,kind:'message'}});
+db.prepare('UPDATE contact_configs SET last_activity=?,next_at=0 WHERE role_id=?').run(now-120*60000,roleE.id);
+db.prepare('DELETE FROM contact_daily_budget').run();
+await worker.runProactiveScheduled(env,now,async()=>new Response('secret upstream body must not be disclosed',{status:401}));
+const failure=(await api(eb+'config',{key:roleE.access_token})).j;assert.equal(failure.status.last_outcome.code,'model_http_401');assert(!JSON.stringify(failure).includes('secret upstream body'));assert(!JSON.stringify(failure).includes(settings.api_key));
 Date.now=nativeNow;
 assert.equal((await api('/api/roles/'+roleA.id+'/proactive/activity',{key:roleC.access_token,data:{last_activity:Date.now()}})).status,403,'activity updates remain role scoped');
 console.log('PASS cloud proactive: real SQLite, role authorization, encrypted keys/subscriptions, quotas, cooldown, heartbeat/ack idempotency, independent Web Push decryption, VAPID signature, disable/removal, backup secrecy, true inactivity, background-vs-user activity, same-absence deduplication, in-flight return cancellation, and free-plan import batching. All HTTP calls mocked; no live delivery or generation.');
